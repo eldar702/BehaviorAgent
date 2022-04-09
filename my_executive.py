@@ -1,4 +1,3 @@
-# Eldar Shlomi 205616634
 import random
 import sys
 import utils
@@ -23,8 +22,10 @@ class BehaviorBaseAgent(Executor):
     def graph_initialize(self, domain_type):
         actions = []
         if "football" in domain_type:
-            actions, = ["connected"]
+            actions = ["connected"]
             self.domain_flag = "football"
+            self.derive_ball_details()
+
         elif "maze" in domain_type:
             actions = ["west", "east", "south", "north"]
             self.domain_flag = "maze"
@@ -38,7 +39,9 @@ class BehaviorBaseAgent(Executor):
     def initialize(self, services):
         self.services = services
         self.graph_initialize(self.services.parser.domain_name)
-
+        if self.domain_flag == "football":
+            self.derive_ball_details()
+            
     def next_action(self):
         if self.services.goal_tracking.reached_all_goals():
             return None
@@ -51,9 +54,6 @@ class BehaviorBaseAgent(Executor):
             return self.best_football_option(valid_actions)
         elif self.domain_flag == "maze":
             return self.best_maze_option(valid_actions)
-
-    def best_football_option(self, valid_actions):
-        return "kululu"
 
     def best_maze_option(self, all_options):
         best_path, best_path_len = [], float('inf')
@@ -88,10 +88,53 @@ class BehaviorBaseAgent(Executor):
             elif checked_path_len < best_path_len:
                 best_path = sub_goal
                 best_path_len = checked_path_len
-        # if len(best_path) > 1:
-        #     return random.choice(best_path),
         return best_path_len
+    
+    def best_football_option(self, all_options):
 
+        best_path, best_path_len = [], float('inf')
+        action_name, src_tile, dest_tile, ball_name, dest_tile_2 = None, None, None, None, None
+        self.change_ball_location()
+        for option in all_options:
+            option = ''.join([char for char in option if (char != '(' and char != ')')])
+            action_name = option.split(' ')[0]
+            if action_name == "move":
+                src_tile = option.split(' ')[1]
+                dest_tile = option.split(' ')[2]
+
+            elif action_name == "kick":
+                ball_name = option.split(' ')[1]
+                src_tile = option.split(' ')[2]
+                dest_tile = option.split(' ')[3]
+                dest_tile_2 = dest_tile = option.split(' ')[4]
+                if utils.is_same(dest_tile, dest_tile_2): continue
+                
+        best_action = None
+        self.chosen_ball, self.desire_place, self.not_desire_place = None, None, None
+        return "kululu"
+
+    def derive_ball_details(self):
+        self.balls_place, self.balls_goal = {}, {}
+        for state in self.services.parser.initial_state["at-ball"]:
+            ball_name = state[0]
+            ball_location = state[1]
+            if ball_name not in self.balls_place.keys():
+                self.balls_place[ball_name] = ball_location
+
+        for raw_sub_goal in self.services.goal_tracking.uncompleted_goals:
+            sub_goal = utils.get_goal(raw_sub_goal)
+            subGoal_ball_name = sub_goal[0][0]
+            subGoal_ball_goal = sub_goal[0][1]
+            if subGoal_ball_name not in self.balls_goal.keys():
+                self.balls_goal[subGoal_ball_name] = subGoal_ball_goal
+                
+    # TODO: CREATE A SENTENCE OF THE LAST ACTION. CAN TAKE IT FROM LAST CHOSEN ACTION
+    def change_ball_location(self, ball_name):
+        current_state = self.services.perception.get_state()
+        if self.services.parser.test_condition(self.desire_place, current_state):
+            return
+        self.balls_place[ball_name] = self.not_desire_place
+        
     def heuristic(self, option):
         pass
 
