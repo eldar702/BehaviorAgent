@@ -1,5 +1,3 @@
-# Eldar Shlomi 205616634
-
 from pddlsim.parser_independent import Literal, Disjunction, Conjunction
 from collections import defaultdict
 import random
@@ -15,6 +13,11 @@ def get_goal(goal_raw_details):
         goals = get_goal(sub_goal)
     return goals
 
+
+def is_same(str1, str2):
+    if str1 == str2:
+        return True
+    return False
 
 ############       Graph Helper Function       ###############
 def get_min_path(bfs_nodes, destination_node):
@@ -32,16 +35,6 @@ def get_min_path(bfs_nodes, destination_node):
     return path, path_length
 
 
-def calculate_chance(action):
-    if "west" in action:
-        return 1 - 0.8
-    if "east" in action:
-        return 1 - 0.75
-    if "north" in action:
-        return 1 - 0.5
-    if "south" in action:
-        return 1 - 0.75
-
 
 ############       GRAPH Class       ################
 class Graph:
@@ -53,20 +46,6 @@ class Graph:
     def addEdge(self, u, v):
         self.graph[u].append(v)
 
-    # @staticmethod
-    # def get_min_path(bfs_nodes, destination_node):
-    #     if destination_node is None:
-    #         return None
-    #     path = []
-    #     node = destination_node
-    #     path.append(node)
-    #
-    #     while bfs_nodes[node] != -1:
-    #         path.append(bfs_nodes[node])
-    #         node = bfs_nodes[node]
-    #     path.reverse()
-    #     path_length = len(path)
-    #     return path, path_length
     def get_min_path_length(self, src_node, dest_node):
         bfs_network, distance = self.bfs(src_node)
         min_path, min_path_len = get_min_path(bfs_network, dest_node)
