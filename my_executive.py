@@ -1,3 +1,4 @@
+# Eldar Shlomi 205616634
 import random
 import sys
 import utils
@@ -109,7 +110,7 @@ class BehaviorBaseAgent(Executor):
 
     def best_football_option(self, all_options):
 
-        best_path, best_path_profit, profit = [], float('-inf'), float('-inf')
+        best_path, best_path_profit, profit = [], float('inf'), float('inf')
         action_name, src_tile, dest_tile, ball_name, dest_tile_2 = None, None, None, None, None
         self.change_ball_location() # TODO: THIS FUNC
         for option in all_options:
@@ -119,29 +120,29 @@ class BehaviorBaseAgent(Executor):
                 src_tile = option.split(' ')[1]
                 dest_tile = option.split(' ')[2]
                 profit = self.heuristic_move_FB(src_tile, dest_tile)
-
+                # print(option + " " + )
             elif action_name == "kick":
                 ball_name = option.split(' ')[1]
                 src_tile = option.split(' ')[2]
                 dest_tile = option.split(' ')[3]
                 dest_tile_2 = option.split(' ')[4]
-                profit = self.heuristic_kick_FB(ball_name, src_tile, dest_tile, dest_tile_2)
                 if utils.is_same(dest_tile, dest_tile_2): continue
+                profit = self.heuristic_kick_FB(ball_name, src_tile, dest_tile, dest_tile_2)
 
             if profit == best_path_profit:
                 best_path.append(option)
-            elif profit > best_path_profit:
+            elif profit < best_path_profit:
                 best_path = [option]
                 best_path_profit = profit
 
         if len(best_path) > 1:
-            best_path = random.choice(best_path)
-        if best_path.split(' ')[0] == "kick":
-            self.chosen_ball = best_path.split(' ')[1]
-            self.desire_place = best_path.split(' ')[3]
-            self.not_desire_place = best_path.split(' ')[4]
+            best_path = [random.choice(best_path)]
+        if "kick" in best_path:
+            self.chosen_ball = best_path[0].split(' ')[1]
+            self.desire_place = best_path[0].split(' ')[3]
+            self.not_desire_place = best_path[0].split(' ')[4]
 
-        return best_path
+        return random.choice(best_path)
 
 ##############################            Heuristic Functions               #################################
     def heuristic_move_FB(self, src_tile, dest_tile):
@@ -162,17 +163,17 @@ class BehaviorBaseAgent(Executor):
         return self.heuristic("football-kick", profit_src, profit_dst, profit_dst_2)
 
     def find_closet_ball(self, tile):
-        min_dist, chosen_ball_location = float('inf'), []
+        min_dist, chosen_ball_location = float('inf'), None
         for ball_place in self.balls_place.values():
             checked_dist = self.graph.get_min_path_length(tile, ball_place)
             if checked_dist < min_dist:
                 min_dist = checked_dist
-                chosen_ball_location = [ball_place]
-            elif checked_dist == min_dist:
-                chosen_ball_location.append(ball_place)
-        if len(chosen_ball_location) > 1:
-            chosen_ball_location = random.choice(chosen_ball_location)
-        return chosen_ball_location[0]
+                chosen_ball_location = ball_place
+            # elif checked_dist == min_dist:
+            #     chosen_ball_location.append(ball_place)
+        # if len(chosen_ball_location) > 1:
+        #     chosen_ball_location = random.choice(chosen_ball_location)
+        return chosen_ball_location
 
 
     # TODO: CREATE A SENTENCE OF THE LAST ACTION. CAN TAKE IT FROM LAST CHOSEN ACTION
@@ -190,12 +191,18 @@ class BehaviorBaseAgent(Executor):
     # we will multiply by 1000 (compared to 100 in displacement). Now - the formula will
     # be the difference in distance between the ball after the displacement to its goal
     def heuristic(self, name, *var):
-
+        ### first version:
+        # if name == "football-move":
+        #     return 100 * (var[0] - var[1])  # 100 * (before_move_dist - after_move_dist )
+        # if name == "football-kick":
+        #     # 1000 * (before_kick_dist - after_kick_desire_dist) + (before_kick_dist - after_kick_not_desired_dist)
+        #     return 1000 * (0.8 * (var[0] - var[1]) + (0.2 * var[0] - var[2]))
+        epsilon = 0.001
         if name == "football-move":
-            return 100 * (var[0] - var[1])  # 100 * (before_move_dist - after_move_dist )
+            return -10 / ((var[1] * (var[0] - var[1])) + epsilon)  # 100 * (before_move_dist - after_move_dist )
         if name == "football-kick":
             # 1000 * (before_kick_dist - after_kick_desire_dist) + (before_kick_dist - after_kick_not_desired_dist)
-            return 1000 * (0.8 * (var[0] - var[1]) + (0.2 * var[0] - var[2]))
+            return ((-1000 - 200 * (var[0] - var[2])) * (var[0] - var[1])) / ((0.8 * (var[1])) + epsilon)
         pass
 
 
