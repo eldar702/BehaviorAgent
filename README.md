@@ -1,1 +1,1 @@
-# RandomAgent
+# Behavior Agent
