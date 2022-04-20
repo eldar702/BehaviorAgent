@@ -4,7 +4,6 @@ import utils
 ##############################            Imports & Globals              #################################
 from pddlsim.executors.executor import Executor
 from pddlsim.local_simulator import LocalSimulator
-from pddlsim.parser_independent import Literal, Disjunction, Conjunction
 
 # read files:
 domain = sys.argv[1]
@@ -27,7 +26,6 @@ class BehaviorBaseAgent(Executor):
             actions = ["connected"]
             self.domain_flag = "football"
             self.derive_ball_details()
-            print("DAS")
         elif "maze" in domain_type:
             actions = ["west", "east", "south", "north"]
             self.domain_flag = "maze"
@@ -45,7 +43,7 @@ class BehaviorBaseAgent(Executor):
             self.derive_ball_details()
 
     def derive_ball_details(self):
-        self.balls_place, self.balls_goal = {}, {}
+        self.balls_place, self.balls_goal, self.finished_balls = {}, {}, []
         for state in self.services.parser.initial_state["at-ball"]:
             ball_name = state[0]
             ball_location = state[1]
@@ -71,6 +69,7 @@ class BehaviorBaseAgent(Executor):
         if len(valid_actions) == 1:
             return valid_actions[0]
         elif self.domain_flag == "football":
+            self.update_balls_places(self.services.perception.get_state())
             return self.best_football_option(valid_actions)
         elif self.domain_flag == "maze":
             return self.best_maze_option(valid_actions)
@@ -110,10 +109,10 @@ class BehaviorBaseAgent(Executor):
         return best_path_len
 
     def best_football_option(self, all_options):
-
+        actions_lists = [[] for tt in range(4)]
         best_path, best_path_profit, profit = [], float('inf'), float('inf')
         action_name, src_tile, dest_tile, ball_name, dest_tile_2 = None, None, None, None, None
-        self.change_ball_location() # TODO: THIS FUNC
+
         for option in all_options:
             option = ''.join([char for char in option if (char != '(' and char != ')')])
             action_name = option.split(' ')[0]
@@ -121,13 +120,14 @@ class BehaviorBaseAgent(Executor):
                 src_tile = option.split(' ')[1]
                 dest_tile = option.split(' ')[2]
                 profit = self.heuristic_move_FB(src_tile, dest_tile)
-                # print(option + " " + )
+
             elif action_name == "kick":
                 ball_name = option.split(' ')[1]
                 src_tile = option.split(' ')[2]
                 dest_tile = option.split(' ')[3]
                 dest_tile_2 = option.split(' ')[4]
                 if utils.is_same(dest_tile, dest_tile_2): continue
+                if ball_name not in self.balls_goal.keys(): continue
                 profit = self.heuristic_kick_FB(ball_name, src_tile, dest_tile, dest_tile_2)
 
             if profit == best_path_profit:
@@ -138,10 +138,6 @@ class BehaviorBaseAgent(Executor):
 
         if len(best_path) > 1:
             best_path = [random.choice(best_path)]
-        if "kick" in best_path:
-            self.chosen_ball = best_path[0].split(' ')[1]
-            self.desire_place = best_path[0].split(' ')[3]
-            self.not_desire_place = best_path[0].split(' ')[4]
 
         return random.choice(best_path)
 
@@ -157,11 +153,22 @@ class BehaviorBaseAgent(Executor):
     def heuristic_kick_FB(self, ball_name, src_tile, dest_tile, dest_tile_2):
         profit_src, profit_dst, profit_dst_2 = None, None, None
         goal_tile = self.balls_goal[ball_name]
-        closest_ball_tile = self.find_closet_ball(dest_tile)
         profit_src = self.graph.get_min_path_length(src_tile, goal_tile)
         profit_dst = self.graph.get_min_path_length(dest_tile, goal_tile)
         profit_dst_2 = self.graph.get_min_path_length(dest_tile_2, goal_tile)
         return self.heuristic("football-kick", profit_src, profit_dst, profit_dst_2)
+
+    def update_balls_places(self, state):
+        balls_details = list(state["at-ball"])
+
+        for ball_name, ball_location in balls_details:
+            if ball_name in self.finished_balls: continue
+            if ball_name not in self.balls_goal.keys(): continue
+            self.balls_place[ball_name] = ball_location
+            if ball_location == self.balls_goal[ball_name]:
+                self.finished_balls.append(ball_name)
+                self.balls_goal.pop(ball_name, None)
+                self.balls_place.pop(ball_name, None)
 
     def find_closet_ball(self, tile):
         min_dist, chosen_ball_location = float('inf'), None
@@ -170,44 +177,21 @@ class BehaviorBaseAgent(Executor):
             if checked_dist < min_dist:
                 min_dist = checked_dist
                 chosen_ball_location = ball_place
-            # elif checked_dist == min_dist:
-            #     chosen_ball_location.append(ball_place)
-        # if len(chosen_ball_location) > 1:
-        #     chosen_ball_location = random.choice(chosen_ball_location)
         return chosen_ball_location
 
 
-    # TODO: CREATE A SENTENCE OF THE LAST ACTION. CAN TAKE IT FROM LAST CHOSEN ACTION
-    def change_ball_location(self):
-        if self.chosen_ball is None or self.desire_place is None: return
-        string = "(at-ball " + self.chosen_ball + " " + self.desire_place + ")"
-        current_state = self.services.perception.get_state()
-        if self.services.parser.test_condition(string, current_state):
-            return
-        self.balls_place[self.chosen_ball] = self.not_desire_place
     #desc: the heuristic function for all the policies
-    # the move policy: calculate the difference between the distance to
-    # the closet ball before and after the move (and multiple by 100)
-    # the kick policy: First we will prefer a kick at the expense of move, which is why
-    # we will multiply by 1000 (compared to 100 in displacement). Now - the formula will
-    # be the difference in distance between the ball after the displacement to its goal
+    # We choose the move whose value is the smallest, so first we will check if the move is "good", and the intention -
+    # we will check if it brings us closer to the goal. When in the kick we will check if the kick brings us closer to
+    # the goal and in "move" we will check if the movement brings us closer to a ball.
     def heuristic(self, name, *var):
-        ### first version:
-        # if name == "football-move":
-        #     return 100 * (var[0] - var[1])  # 100 * (before_move_dist - after_move_dist )
-        # if name == "football-kick":
-        #     # 1000 * (before_kick_dist - after_kick_desire_dist) + (before_kick_dist - after_kick_not_desired_dist)
-        #     return 1000 * (0.8 * (var[0] - var[1]) + (0.2 * var[0] - var[2]))
         epsilon = 0.001
         if name == "football-move":
-            return -10 / ((var[1] * (var[0] - var[1])) + epsilon)  # 100 * (before_move_dist - after_move_dist )
+            return -10 / ((var[1] * (var[0] - var[1])) + epsilon)
+
         if name == "football-kick":
-            # 1000 * (before_kick_dist - after_kick_desire_dist) + (before_kick_dist - after_kick_not_desired_dist)
             return ((-1000 - 200 * (var[0] - var[2])) * (var[0] - var[1])) / ((0.8 * (var[1])) + epsilon)
-        # return -1000 * (var[0] - var[1]) - 
         pass
-
-
 
 
 print LocalSimulator().run(domain, problem, BehaviorBaseAgent())
