@@ -1,4 +1,3 @@
-# Eldar Shlomi 205616634
 import random
 import sys
 import utils
@@ -28,7 +27,7 @@ class BehaviorBaseAgent(Executor):
             actions = ["connected"]
             self.domain_flag = "football"
             self.derive_ball_details()
-
+            print("DAS")
         elif "maze" in domain_type:
             actions = ["west", "east", "south", "north"]
             self.domain_flag = "maze"
@@ -54,11 +53,13 @@ class BehaviorBaseAgent(Executor):
                 self.balls_place[ball_name] = ball_location
 
         for raw_sub_goal in self.services.goal_tracking.uncompleted_goals:
+
             sub_goal = utils.get_goal(raw_sub_goal)
-            subGoal_ball_name = sub_goal[0][0]
-            subGoal_ball_goal = sub_goal[0][1]
-            if subGoal_ball_name not in self.balls_goal.keys():
-                self.balls_goal[subGoal_ball_name] = subGoal_ball_goal
+            for idx in range(len(sub_goal)):
+                subGoal_ball_name = sub_goal[idx][0]
+                subGoal_ball_goal = sub_goal[idx][1]
+                if subGoal_ball_name not in self.balls_goal.keys():
+                    self.balls_goal[subGoal_ball_name] = subGoal_ball_goal
 
 ##############################            Next Action Functions               #################################
     def next_action(self):
@@ -203,6 +204,7 @@ class BehaviorBaseAgent(Executor):
         if name == "football-kick":
             # 1000 * (before_kick_dist - after_kick_desire_dist) + (before_kick_dist - after_kick_not_desired_dist)
             return ((-1000 - 200 * (var[0] - var[2])) * (var[0] - var[1])) / ((0.8 * (var[1])) + epsilon)
+        # return -1000 * (var[0] - var[1]) - 
         pass
 
 
