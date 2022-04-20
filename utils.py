@@ -4,15 +4,27 @@ import random
 
 
 ###############   Domain Helper Functions      ##############
+#
+# def get_goal(goal_raw_details):
+#     if isinstance(goal_raw_details, Literal):
+#         return [goal_raw_details.args]
+#     goals = []
+#     for sub_goal in goal_raw_details.parts:
+#         goals = get_goal(sub_goal)
+#     return goals
+
 
 def get_goal(goal_raw_details):
     if isinstance(goal_raw_details, Literal):
         return [goal_raw_details.args]
-    goals = []
+    goals_list = []
     for sub_goal in goal_raw_details.parts:
-        goals = get_goal(sub_goal)
-    return goals
-
+         goals = get_goal(sub_goal)
+         if len(goals) == 1:
+             goals_list.append(goals[0])
+         else:
+             goals_list.extend(goals)
+    return goals_list
 
 def is_same(str1, str2):
     if str1 == str2:
