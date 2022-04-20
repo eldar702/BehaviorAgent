@@ -1,5 +1,3 @@
-# Eldar Shlomi 205616634
-
 from pddlsim.parser_independent import Literal, Disjunction, Conjunction
 from collections import defaultdict
 import random
